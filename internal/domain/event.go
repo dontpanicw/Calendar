@@ -3,8 +3,8 @@ package domain
 import "time"
 
 type Event struct {
-	eventId     int64
-	userId      int64
-	date        time.Time
-	description string
+	EventId     int64     `json:"event_id"`
+	UserId      int64     `json:"user_id"`
+	Date        time.Time `json:"date"`
+	Description string    `json:"description"`
 }
