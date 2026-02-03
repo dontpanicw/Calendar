@@ -23,6 +23,115 @@ func NewHandler(usecases port.EventUsecases) *Handler {
 	return &Handler{usecases: usecases}
 }
 
+func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
+	event, err := parseBodyCreate(r)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.usecases.CreateEvent(r.Context(), event); err != nil {
+		if isBusinessError(err) {
+			writeError(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeResultMessage(w, "event created")
+}
+
+func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
+	event, err := parseBodyUpdate(r)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.usecases.UpdateEvent(r.Context(), event); err != nil {
+		if isBusinessError(err) {
+			writeError(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeResultMessage(w, "event updated")
+}
+
+func (h *Handler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
+	eventID, err := parseBodyDelete(r)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.usecases.DeleteEvent(r.Context(), eventID); err != nil {
+		if isBusinessError(err) {
+			writeError(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeResultMessage(w, "event deleted")
+}
+
+func (h *Handler) EventsForDay(w http.ResponseWriter, r *http.Request) {
+	userID, date, err := parseQueryUserDate(r)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	events, err := h.usecases.GetEventsForDay(r.Context(), userID, date)
+	if err != nil {
+		if isBusinessError(err) {
+			writeError(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeResult(w, events)
+}
+
+func (h *Handler) EventsForWeek(w http.ResponseWriter, r *http.Request) {
+	userID, date, err := parseQueryUserDate(r)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// Неделя: от начала дня date до конца недели (7 дней)
+	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	events, err := h.usecases.GetEventsForWeek(r.Context(), userID, start)
+	if err != nil {
+		if isBusinessError(err) {
+			writeError(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeResult(w, events)
+}
+
+func (h *Handler) EventsForMonth(w http.ResponseWriter, r *http.Request) {
+	userID, date, err := parseQueryUserDate(r)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// Месяц: первый день месяца
+	start := time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location())
+	events, err := h.usecases.GetEventsForMonth(r.Context(), userID, start)
+	if err != nil {
+		if isBusinessError(err) {
+			writeError(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeResult(w, events)
+}
+
 // writeResult отправляет успешный ответ 200 OK с {"result": ...}
 func writeResult(w http.ResponseWriter, result interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -167,113 +276,4 @@ func isBusinessError(err error) bool {
 	}
 	s := err.Error()
 	return s == "event not found" || s == "event already exists"
-}
-
-func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
-	event, err := parseBodyCreate(r)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := h.usecases.CreateEvent(r.Context(), event); err != nil {
-		if isBusinessError(err) {
-			writeError(w, err.Error(), http.StatusServiceUnavailable)
-			return
-		}
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeResultMessage(w, "event created")
-}
-
-func (h *Handler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
-	event, err := parseBodyUpdate(r)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := h.usecases.UpdateEvent(r.Context(), event); err != nil {
-		if isBusinessError(err) {
-			writeError(w, err.Error(), http.StatusServiceUnavailable)
-			return
-		}
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeResultMessage(w, "event updated")
-}
-
-func (h *Handler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
-	eventID, err := parseBodyDelete(r)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := h.usecases.DeleteEvent(r.Context(), eventID); err != nil {
-		if isBusinessError(err) {
-			writeError(w, err.Error(), http.StatusServiceUnavailable)
-			return
-		}
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeResultMessage(w, "event deleted")
-}
-
-func (h *Handler) EventsForDay(w http.ResponseWriter, r *http.Request) {
-	userID, date, err := parseQueryUserDate(r)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	events, err := h.usecases.GetEventsForDay(r.Context(), userID, date)
-	if err != nil {
-		if isBusinessError(err) {
-			writeError(w, err.Error(), http.StatusServiceUnavailable)
-			return
-		}
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeResult(w, events)
-}
-
-func (h *Handler) EventsForWeek(w http.ResponseWriter, r *http.Request) {
-	userID, date, err := parseQueryUserDate(r)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	// Неделя: от начала дня date до конца недели (7 дней)
-	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
-	events, err := h.usecases.GetEventsForWeek(r.Context(), userID, start)
-	if err != nil {
-		if isBusinessError(err) {
-			writeError(w, err.Error(), http.StatusServiceUnavailable)
-			return
-		}
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeResult(w, events)
-}
-
-func (h *Handler) EventsForMonth(w http.ResponseWriter, r *http.Request) {
-	userID, date, err := parseQueryUserDate(r)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	// Месяц: первый день месяца
-	start := time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location())
-	events, err := h.usecases.GetEventsForMonth(r.Context(), userID, start)
-	if err != nil {
-		if isBusinessError(err) {
-			writeError(w, err.Error(), http.StatusServiceUnavailable)
-			return
-		}
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeResult(w, events)
 }
