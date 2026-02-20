@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/dontpanicw/calendar/log_worker"
+	"github.com/dontpanicw/calendar/notify_worker"
 	"time"
 
 	"github.com/dontpanicw/calendar/internal/domain"
@@ -15,13 +16,15 @@ var (
 )
 
 type UsecaseEvent struct {
-	repo   port.EventRepository
-	logger *log_worker.Logger
+	repo         port.EventRepository
+	logger       *log_worker.Logger
+	notifyWorker *notify_worker.NotifyWorker
 }
 
-func NewUsecaseEvent(repo port.EventRepository, logger *log_worker.Logger) *UsecaseEvent {
+func NewUsecaseEvent(repo port.EventRepository, logger *log_worker.Logger, notifyWorker *notify_worker.NotifyWorker) *UsecaseEvent {
 	return &UsecaseEvent{repo: repo,
-		logger: logger,
+		logger:       logger,
+		notifyWorker: notifyWorker,
 	}
 }
 
@@ -32,7 +35,12 @@ func (u *UsecaseEvent) CreateEvent(ctx context.Context, event *domain.Event) err
 	if event.Description == "" {
 		return errors.New("event description is required")
 	}
-	return u.repo.CreateEvent(ctx, event)
+	err := u.repo.CreateEvent(ctx, event)
+	if err != nil {
+		return err
+	}
+	u.notifyWorker.SendNotify(event)
+	return nil
 }
 
 func (u *UsecaseEvent) UpdateEvent(ctx context.Context, event domain.Event) error {

@@ -14,8 +14,8 @@ type Config struct {
 	PostgresConnStr string
 }
 
-func NewConfig() (Config, error) {
-	cfg := Config{}
+func NewConfig() (*Config, error) {
+	cfg := &Config{}
 
 	if err := godotenv.Load(); err != nil {
 		log.Print("No .env file found")

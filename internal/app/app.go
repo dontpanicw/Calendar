@@ -11,6 +11,7 @@ import (
 	"github.com/dontpanicw/calendar/internal/input/http/handlers"
 	"github.com/dontpanicw/calendar/internal/usecases"
 	"github.com/dontpanicw/calendar/log_worker"
+	"github.com/dontpanicw/calendar/notify_worker"
 	"github.com/dontpanicw/calendar/pkg/migrations"
 	"net/http"
 	"os"
@@ -28,20 +29,28 @@ func Start(cfg *config.Config) error {
 	logger := log_worker.NewLogger()
 	go logger.Log(ctx)
 
+	notifyWorker := notify_worker.NewNotifyWorker()
+	go notifyWorker.Start(ctx)
+
 	// Retry подключения к PostgreSQL
 	var db *sql.DB
 	var err error
 
 	for i := 0; i < 10; i++ {
-		db, err = sql.Open("postgres", cfg.PostgresConnStr)
-		if err == nil {
-			err = db.Ping()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			db, err = sql.Open("postgres", cfg.PostgresConnStr)
 			if err == nil {
-				break
+				err = db.Ping()
+				if err == nil {
+					break
+				}
 			}
+			logger.Writef("Waiting for PostgreSQL... (attempt %d/10): %v", i+1, err)
+			time.Sleep(3 * time.Second)
 		}
-		logger.Writef("Waiting for PostgreSQL... (attempt %d/10): %v", i+1, err)
-		time.Sleep(3 * time.Second)
 	}
 
 	if err != nil {
@@ -70,7 +79,7 @@ func Start(cfg *config.Config) error {
 	cleaningWorker := cleaning_worker.NewCleaningWorker(10, eventRepo)
 	go cleaningWorker.Start(ctx)
 
-	eventUsecase := usecases.NewUsecaseEvent(eventRepo, logger)
+	eventUsecase := usecases.NewUsecaseEvent(eventRepo, logger, notifyWorker)
 	srv := handlers.NewServer(eventUsecase, logger)
 
 	httpServer := &http.Server{
@@ -93,7 +102,7 @@ func Start(cfg *config.Config) error {
 	logger.Write("Shutting down gracefully...")
 
 	// Даём серверу и воркеру время на завершение
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
