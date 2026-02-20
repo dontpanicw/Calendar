@@ -10,7 +10,8 @@ import (
 const DefaultHTTPPort = ":8080"
 
 type Config struct {
-	HTTPPort string
+	HTTPPort        string
+	PostgresConnStr string
 }
 
 func NewConfig() (Config, error) {
@@ -31,5 +32,11 @@ func NewConfig() (Config, error) {
 			cfg.HTTPPort = httpPort
 		}
 	}
+
+	postgresConnStr := os.Getenv("POSTGRES_DSN")
+	if postgresConnStr != "" {
+		cfg.PostgresConnStr = postgresConnStr
+	}
+
 	return cfg, nil
 }
