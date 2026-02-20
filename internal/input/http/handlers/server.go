@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/dontpanicw/calendar/log_worker"
 	"log"
 	"net/http"
 	"time"
@@ -12,11 +13,11 @@ type Server struct {
 	mux *http.ServeMux
 }
 
-func NewServer(usecases port.EventUsecases) *Server {
+func NewServer(usecases port.EventUsecases, logger *log_worker.Logger) *Server {
 	s := &Server{
 		mux: http.NewServeMux(),
 	}
-	h := NewHandler(usecases)
+	h := NewHandler(usecases, logger)
 
 	s.mux.HandleFunc("POST /create_event", h.CreateEvent)
 	s.mux.HandleFunc("POST /update_event", h.UpdateEvent)

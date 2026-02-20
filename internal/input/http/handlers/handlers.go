@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"github.com/dontpanicw/calendar/log_worker"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,10 +18,14 @@ const dateLayout = "2006-01-02"
 
 type Handler struct {
 	usecases port.EventUsecases
+	logger   *log_worker.Logger
 }
 
-func NewHandler(usecases port.EventUsecases) *Handler {
-	return &Handler{usecases: usecases}
+func NewHandler(usecases port.EventUsecases, logger *log_worker.Logger) *Handler {
+	return &Handler{
+		usecases: usecases,
+		logger:   logger,
+	}
 }
 
 func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {

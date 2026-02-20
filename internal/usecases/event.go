@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"github.com/dontpanicw/calendar/log_worker"
 	"time"
 
 	"github.com/dontpanicw/calendar/internal/domain"
@@ -14,11 +15,14 @@ var (
 )
 
 type UsecaseEvent struct {
-	repo port.EventRepository
+	repo   port.EventRepository
+	logger *log_worker.Logger
 }
 
-func NewUsecaseEvent(repo port.EventRepository) *UsecaseEvent {
-	return &UsecaseEvent{repo: repo}
+func NewUsecaseEvent(repo port.EventRepository, logger *log_worker.Logger) *UsecaseEvent {
+	return &UsecaseEvent{repo: repo,
+		logger: logger,
+	}
 }
 
 func (u *UsecaseEvent) CreateEvent(ctx context.Context, event *domain.Event) error {

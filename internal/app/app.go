@@ -10,8 +10,8 @@ import (
 	"github.com/dontpanicw/calendar/internal/adapter/repository/postgres"
 	"github.com/dontpanicw/calendar/internal/input/http/handlers"
 	"github.com/dontpanicw/calendar/internal/usecases"
+	"github.com/dontpanicw/calendar/log_worker"
 	"github.com/dontpanicw/calendar/pkg/migrations"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,6 +25,9 @@ func Start(cfg *config.Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	logger := log_worker.NewLogger()
+	go logger.Log(ctx)
+
 	// Retry подключения к PostgreSQL
 	var db *sql.DB
 	var err error
@@ -37,7 +40,7 @@ func Start(cfg *config.Config) error {
 				break
 			}
 		}
-		log.Printf("Waiting for PostgreSQL... (attempt %d/10): %v", i+1, err)
+		logger.Writef("Waiting for PostgreSQL... (attempt %d/10): %v", i+1, err)
 		time.Sleep(3 * time.Second)
 	}
 
@@ -47,19 +50,19 @@ func Start(cfg *config.Config) error {
 	defer func() {
 		err = db.Close()
 		if err != nil {
-			log.Printf("Failed to close database: %v", err)
+			logger.Writef("Failed to close database: %v", err)
 		}
 	}()
-	log.Print("Connected to PostgreSQL")
+	logger.Write("Connected to PostgreSQL")
 
 	if err := migrations.Migrate(db); err != nil {
-		fmt.Println(err)
+		logger.Writef("error %v", err)
 		return err
 	}
-	log.Print("Migrations applied successfully")
+	logger.Write("Migrations applied successfully")
 
 	//eventCache := cache.NewCacheMap()
-	eventRepo, err := postgres.NewRepository(cfg)
+	eventRepo, err := postgres.NewRepository(cfg, logger)
 	if err != nil {
 		return err
 	}
@@ -67,8 +70,8 @@ func Start(cfg *config.Config) error {
 	cleaningWorker := cleaning_worker.NewCleaningWorker(10, eventRepo)
 	go cleaningWorker.Start(ctx)
 
-	eventUsecase := usecases.NewUsecaseEvent(eventRepo)
-	srv := handlers.NewServer(eventUsecase)
+	eventUsecase := usecases.NewUsecaseEvent(eventRepo, logger)
+	srv := handlers.NewServer(eventUsecase, logger)
 
 	httpServer := &http.Server{
 		Addr:         cfg.HTTPPort,
@@ -79,24 +82,24 @@ func Start(cfg *config.Config) error {
 	}
 
 	go func() {
-		log.Printf("Starting server on %s", cfg.HTTPPort)
+		logger.Writef("Starting server on %s", cfg.HTTPPort)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("HTTP server error: %v", err)
+			logger.Writef("HTTP server error: %v", err)
 		}
 	}()
 
 	// Ждём сигнала остановки
 	<-ctx.Done()
-	log.Println("Shutting down gracefully...")
+	logger.Write("Shutting down gracefully...")
 
 	// Даём серверу и воркеру время на завершение
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP shutdown error: %v", err)
+		logger.Writef("HTTP shutdown error: %v", err)
 	}
 
-	log.Println("Application stopped")
+	logger.Write("Application stopped")
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/dontpanicw/calendar/config"
 	"github.com/dontpanicw/calendar/internal/domain"
 	"github.com/dontpanicw/calendar/internal/port"
+	"github.com/dontpanicw/calendar/log_worker"
 	"time"
 )
 
@@ -33,14 +34,15 @@ const (
 )
 
 type Repository struct {
-	DB *sql.DB
+	DB     *sql.DB
+	logger *log_worker.Logger
 }
 
 var (
 	_ port.EventRepository = (*Repository)(nil)
 )
 
-func NewRepository(cfg *config.Config) (*Repository, error) {
+func NewRepository(cfg *config.Config, logger *log_worker.Logger) (*Repository, error) {
 	db, err := sql.Open("postgres", cfg.PostgresConnStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %w", err)
@@ -59,7 +61,8 @@ func NewRepository(cfg *config.Config) (*Repository, error) {
 	}
 
 	return &Repository{
-		DB: db,
+		DB:     db,
+		logger: logger,
 	}, nil
 }
 
