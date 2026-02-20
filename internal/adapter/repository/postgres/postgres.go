@@ -13,7 +13,7 @@ import (
 
 const (
 	updateArchiveEventsQuery = `UPDATE events 
-						  SET is_archive = true 
+						  SET is_archived = true 
 						  WHERE date < NOW() AND is_archived = false;`
 	updateEventsQuery = `UPDATE events 
 			  SET user_id = $1, date = $2, is_archived = $3, description = $4, updated_at = NOW() 

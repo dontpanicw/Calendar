@@ -32,7 +32,7 @@ func (l *Logger) Writef(format string, args ...interface{}) {
 	case l.logChannel <- message:
 	default:
 		// При переполнении используем fallback
-		slog.Error("Log channel full", "format", format, "args", fmt.Sprint(args))
+		slog.Error("Log channel full", "format", format, "args", fmt.Sprint(args...))
 	}
 }
 
